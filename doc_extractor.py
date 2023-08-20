@@ -1,10 +1,12 @@
 import re
+from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
 import zipfile
 import os
+from typing import Dict,List
 
 class DocxExtractor:
-    def __init__(self, docx: str):
+    def __init__(self, docx: str)->None:
         self.docx_path = docx
         self._nsmap = {
             'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main'}
@@ -25,7 +27,7 @@ class DocxExtractor:
         # unzip the docx in memory
         return zipfile.ZipFile(file_path)
 
-    def __xml2text(self, xml):
+    def __xml2text(self, xml:str)->str:
         """
             A string representing the textual content of this run, with content
             child elements like ``<w:tab/>`` translated to their Python
@@ -46,7 +48,7 @@ class DocxExtractor:
                 text += '\n\n'
         return text
 
-    def __qn(self, tag):
+    def __qn(self, tag:str)->str:
         """
             Stands for 'qualified name', a utility function to turn a namespace
             prefixed tag name into a Clark-notation qualified tag name for lxml. For
@@ -57,7 +59,7 @@ class DocxExtractor:
         uri = self._nsmap[prefix]
         return '{{{}}}{}'.format(uri, tagroot)
 
-    def getFileTree(self):
+    def getFileTree(self)->Dict[str,Dict]:
         fileTree = dict()
 
         for file in self.filelist:
@@ -67,10 +69,13 @@ class DocxExtractor:
                 c_dir = c_dir[_dir]
         return fileTree
 
-    def getTitle(self):
+    def getFileName(self)->str:
+        """
+        returns filename of the document
+        """
         return self._doc_zip.filename
     
-    def unzipDocxToFolder(self,store_dir="",exist_ok= False):
+    def unzipDocxToFolder(self,store_dir:str="",exist_ok:bool= False)->None:
 
         if(store_dir):
             if os.path.exists(store_dir):
@@ -79,7 +84,7 @@ class DocxExtractor:
             else:
                 os.makedirs(store_dir)
         else:
-            store_dir = self.getTitle()
+            store_dir = self.getFileName()
 
         for file in self.filelist:
             full_store_path = os.path.join(store_dir, file)
@@ -90,15 +95,18 @@ class DocxExtractor:
             with open(full_store_path, "wb") as fh:
                  fh.write(self._doc_zip.read(file))
 
-    def getBodyXmlTree(self):
+    def getBodyXmlTree(self)->str:
+        """
+        return xml in the document.xml file of the docx
+        """
         return str(self._doc_zip.read('word/document.xml'),encoding="utf8")
 
-    def extractDocumentBodyText(self):
+    def extractDocumentBodyText(self)->str:
         text = u""
         text += self.__xml2text(self._doc_zip.read('word/document.xml'))
         return re.sub(r"\n{1,}", "\n", text).strip()
 
-    def extractHeaderText(self):
+    def extractHeaderText(self)->str:
         text = u""
         xmls = 'word/header[0-9]*.xml'
         for fname in self.filelist:
@@ -107,7 +115,7 @@ class DocxExtractor:
 
         return re.sub(r"\n{1,}", "\n", text).strip()
 
-    def extractFooterText(self):
+    def extractFooterText(self)->str:
         text = u""
         xmls = 'word/footer[0-9]*.xml'
         for fname in self.filelist:
@@ -130,16 +138,19 @@ class DocxExtractor:
             with open(full_store_path, "wb") as fh:
                 fh.write(self._doc_zip.read("word/media/"+file))
 
-    def extractUrls(self):
-        pass
+    def extract_urls(self)->List[str]:
+        words = self.getBodyXmlTree.split()
+        urls = []
+
+        for word in words:
+            parsed_url = urlparse(word)
+            if parsed_url.scheme and parsed_url.netloc:
+                urls.append(word)
+
+        return urls
 
     def closeDocx(self):
         self._doc_zip.close()
 
 if __name__ == '__main__':
-
-    with DocxExtractor(r"TWO WEEKS OF INTERNSHIP I.docx") as dh:
-
-        print(dh.extractDocumentBodyText())
-
-        dh.unzipDocxToFolder("wow/unzip",exist_ok=True)
+    pass
